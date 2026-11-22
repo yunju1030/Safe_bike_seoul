@@ -41,12 +41,7 @@ small { color: var(--muted); font-size: 13px; }
 .primary { width: 100%; margin-top: 15px; padding: 12px; border: 0; border-radius: 9px; background: var(--green); color: white; font-weight: 700; }
 .primary:hover { background: #0d513e; }
 .form-error { font-size: 14px; color: #962e20; margin-top: 9px; }
-.route-summary { margin-top: 16px; padding: 13px 14px; border-radius: 12px; background: var(--wash); }
 .tag { display: inline-block; padding: 3px 8px; border-radius: 12px; background: #dceee0; color: #245e49; font-size: 13px; font-weight: 700; }
-.route-names { margin-top: 7px; font-size: 14px; font-weight: 700; }
-.route-names span { margin-inline: 2px; color: var(--green); }
-.route-stats { display: flex; flex-wrap: wrap; gap: 16px; align-items: baseline; margin-top: 6px; color: var(--muted); font-size: 14px; }
-.route-stats strong { color: var(--ink); font-size: 24px; letter-spacing: -.05em; }
 .map-card { overflow: hidden; min-height: 395px; background: #e6eee6; }
 .ride-map { position: relative; width: 100%; height: 100%; min-height: inherit; isolation: isolate; }
 .schematic, .kakao-map, .schematic canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -57,16 +52,13 @@ small { color: var(--muted); font-size: 13px; }
 .map-legend { bottom: 18px; left: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 15px; padding: 8px 11px; max-width: calc(100% - 30px); font-size: 14px; }
 .map-legend span { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .map-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
-.map-legend .legend-route { width: 16px; height: 4px; border-radius: 5px; background: var(--green); }
 .legend-station { background: #1b7785; }
 .legend-incident { background: #bc531e; }
-.legend-near-incident { background: #9c251a; }
 .map-pin { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 6px #173d3770; color: white; font-size: 13px; font-weight: 800; background: var(--green); }
 .schematic-pin { position: absolute; transform: translate(-50%, -50%); }
 .map-pin.end { background: #173b31; }
 .map-pin.station { min-width: 26px; width: max-content; height: 26px; padding-inline: 4px; background: #1b7785; }
 .map-pin.incident { width: 13px; height: 13px; background: #bc531e; }
-.map-pin.near-incident { width: 26px; height: 26px; background: #9c251a; }
 .place-label { position: absolute; color: #536b62; font-size: 14px; font-weight: 800; letter-spacing: .08em; text-shadow: 0 1px white; }
 .yeouido { left: 11%; top: 49%; }
 .yongsan { left: 49%; top: 28%; }
@@ -89,25 +81,14 @@ small { color: var(--muted); font-size: 13px; }
 .station-meta button { border: 1px solid var(--line); padding: 5px 7px; border-radius: 7px; background: white; color: var(--green); white-space: nowrap; }
 .station-meta button:disabled { cursor: default; opacity: .65; }
 .station-status { margin-top: 5px; color: var(--muted); font-size: 13px; }
+.route-unavailable { margin-top: 12px; }
 .station-distance { display: block; margin-top: 2px; }
-.incident-list li { justify-content: flex-start; }
-.incident-list small { display: block; margin-top: 3px; }
-.incident-list strong { white-space: normal; overflow-wrap: anywhere; }
-.nearby-heading { font-size: 14px; font-weight: 700; margin-top: 12px; }
-.incident-dot { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border-radius: 50%; background: #faeade; color: #93401b; font-weight: 800; }
 .weather-main { display: flex; align-items: center; gap: 12px; margin-block: 10px; }
 .weather-main strong { font-size: 38px; line-height: 1; letter-spacing: -.06em; }
 .forecast-details { margin: 0; font-size: 14px; }
 .forecast-details div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; padding-block: 6px; border-top: 1px solid var(--line); }
 .forecast-details dt { color: var(--muted); }
 .forecast-details dd { margin: 0; font-weight: 700; }
-.route-comparison { grid-column: 1 / -1; }
-.comparison-note { margin-top: 7px; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.route-comparison table { width: 100%; border-collapse: collapse; margin-block: 12px 8px; font-size: 14px; }
-.route-comparison th, .route-comparison td { padding: 8px; text-align: left; border-bottom: 1px solid var(--line); }
-.route-comparison td { white-space: nowrap; }
-.route-comparison tr[data-active="true"] { background: var(--wash); }
-.route-comparison button { border: 0; padding: 3px 0; text-align: left; background: transparent; color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .source-note { margin-top: 12px; color: var(--muted); font-size: 13px; }
 .source-note a { color: var(--green); text-underline-offset: 2px; }
 .map-status { max-width: calc(100% - 30px); }
@@ -123,7 +104,6 @@ small { color: var(--muted); font-size: 13px; }
   .header-inner { height: 59px; }
   .dashboard { padding-top: 22px; }
   .dashboard-grid, .layers { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .route-comparison th, .route-comparison td { padding-inline: 5px; overflow-wrap: anywhere; }
   .map-card { min-height: 350px; }
   .map-legend { gap: 5px 9px; font-size: 13px; }
   .card-heading { align-items: center; }

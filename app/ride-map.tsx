@@ -4,7 +4,7 @@ import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
 import { type Point } from "./demo-data";
 
-export type Pin = { id?: string; label: string; point: Point; kind: "start" | "end" | "station" | "incident" | "near-incident"; text?: string };
+export type Pin = { id?: string; label: string; point: Point; kind: "start" | "end" | "station" | "incident"; text?: string };
 
 type Coordinate = { getLat(): number; getLng(): number };
 type Bounds = { extend(point: Coordinate): void };
@@ -20,22 +20,19 @@ type KakaoMaps = {
   LatLng: new (lat: number, lng: number) => Coordinate;
   LatLngBounds: new () => Bounds;
   Map: new (element: HTMLElement, options: { center: Coordinate; level: number }) => MapView;
-  Polyline: new (options: {
-    map: MapView; path: Coordinate[]; strokeColor: string; strokeWeight: number; strokeOpacity: number;
-  }) => Overlay;
   CustomOverlay: new (options: { map: MapView; position: Coordinate; content: HTMLElement; zIndex: number }) => Overlay;
 };
 
 const key = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
-const symbols = { start: "출", end: "도", station: "●", incident: "", "near-incident": "!" };
-const pinOrder = { incident: 1, station: 2, "near-incident": 3, start: 4, end: 4 };
+const symbols = { start: "출", end: "도", station: "●", incident: "" };
+const pinOrder = { incident: 1, station: 2, start: 4, end: 4 };
 const center: Point = [37.519, 126.965];
 
 function project([lat, lng]: Point): [number, number] {
   return [(lng - 126.914) / 0.103, (37.546 - lat) / 0.055];
 }
 
-function Schematic({ path, pins }: { path: readonly Point[]; pins: Pin[] }) {
+function Schematic({ pins }: { pins: Pin[] }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -77,13 +74,7 @@ function Schematic({ path, pins }: { path: readonly Point[]; pins: Pin[] }) {
     for (const x of [272, 454, 643, 800]) {
       line([[x + 24, 145], [x, 315], [x - 22, 470], [x - 70, 590]], "#faf8ec", 9);
     }
-    const route = path.map((point): [number, number] => {
-      const [x, y] = project(point);
-      return [x * width, y * height];
-    });
-    line(route, "#ffffff", 12);
-    line(route, "#126d57", 6);
-  }, [path]);
+  }, []);
 
   return (
     <div className="schematic" aria-label="한강 주변 예시 지도">
@@ -101,7 +92,7 @@ function Schematic({ path, pins }: { path: readonly Point[]; pins: Pin[] }) {
   );
 }
 
-export default function RideMap({ path, pins }: { path: readonly Point[]; pins: Pin[] }) {
+export default function RideMap({ pins }: { pins: Pin[] }) {
   const container = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<{ maps: KakaoMaps; view: MapView }>();
   const [failed, setFailed] = useState(false);
@@ -139,19 +130,10 @@ export default function RideMap({ path, pins }: { path: readonly Point[]; pins: 
   useEffect(() => {
     if (!engine) return;
     const { maps, view } = engine;
-    const coordinates = path.map(([lat, lng]) => new maps.LatLng(lat, lng));
-    const route = new maps.Polyline({ map: view, path: coordinates, strokeColor: "#126d57", strokeWeight: 6, strokeOpacity: 0.94 });
-    return () => route.setMap(null);
-  }, [engine, path]);
-
-  useEffect(() => {
-    if (!engine) return;
-    const { maps, view } = engine;
     const bounds = new maps.LatLngBounds();
-    path.forEach(([lat, lng]) => bounds.extend(new maps.LatLng(lat, lng)));
-    pins.filter(({ kind }) => kind === "station").forEach(({ point }) => bounds.extend(new maps.LatLng(...point)));
+    pins.filter(({ kind }) => kind !== "incident").forEach(({ point }) => bounds.extend(new maps.LatLng(...point)));
     view.setBounds(bounds, 84, 56, 76, 56);
-  }, [engine, path, pins]);
+  }, [engine, pins]);
 
   useEffect(() => {
     if (!engine) return;
@@ -172,7 +154,7 @@ export default function RideMap({ path, pins }: { path: readonly Point[]; pins: 
 
   return (
     <div className="ride-map">
-      {!engine && <Schematic path={path} pins={pins} />}
+      {!engine && <Schematic pins={pins} />}
       <div ref={container} className={`kakao-map ${engine ? "ready" : ""}`} aria-label="카카오 지도" aria-hidden={!engine} />
       {key && <Script id="kakao-maps" src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false`} onReady={initialize} onError={() => setFailed(true)} />}
       <div className="map-status" role="status">
@@ -186,10 +168,8 @@ export default function RideMap({ path, pins }: { path: readonly Point[]; pins: 
         </div>
       )}
       <div className="map-legend">
-        <span><i className="legend-route" /> 예시 경로</span>
         <span><i className="legend-station" /> 따릉이 대여 가능 대수</span>
         <span><i className="legend-incident" /> 과거 사고다발지역</span>
-        <span><i className="legend-near-incident" /> 경로 인접 사고다발지역</span>
       </div>
     </div>
   );
