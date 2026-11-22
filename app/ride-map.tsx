@@ -2,9 +2,10 @@
 
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
-import { type Point } from "./demo-data";
+import type { Point } from "./geo";
+import type { BicycleRoute } from "./bicycle-route";
 
-export type Pin = { id?: string; label: string; point: Point; kind: "start" | "end" | "station" | "incident"; text?: string };
+export type Pin = { id?: string; label: string; point: Point; kind: "origin" | "start" | "end" | "station" | "incident"; text?: string };
 
 type Coordinate = { getLat(): number; getLng(): number };
 type Bounds = { extend(point: Coordinate): void };
@@ -21,68 +22,73 @@ type KakaoMaps = {
   LatLngBounds: new () => Bounds;
   Map: new (element: HTMLElement, options: { center: Coordinate; level: number }) => MapView;
   CustomOverlay: new (options: { map: MapView; position: Coordinate; content: HTMLElement; zIndex: number }) => Overlay;
+  Polyline: new (options: { map: MapView; path: Coordinate[]; strokeColor: string; strokeWeight: number; strokeOpacity: number; strokeStyle: string; zIndex: number }) => Overlay;
 };
 
 const key = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
-const symbols = { start: "출", end: "도", station: "●", incident: "" };
-const pinOrder = { incident: 1, station: 2, start: 4, end: 4 };
-const center: Point = [37.519, 126.965];
+const symbols = { origin: "검", start: "출", end: "도", station: "●", incident: "" };
+const pinOrder = { incident: 1, station: 2, origin: 3, start: 4, end: 4 };
+const center: Point = [37.55, 126.99];
 
-function project([lat, lng]: Point): [number, number] {
-  return [(lng - 126.914) / 0.103, (37.546 - lat) / 0.055];
+function routeStyle(selected: boolean) {
+  return { color: selected ? "#1859ed" : "#758298", weight: selected ? 7 : 5, dashed: !selected };
 }
 
-function Schematic({ pins }: { pins: Pin[] }) {
+function Schematic({ pins, routes, activeRoute }: { pins: Pin[]; routes: BicycleRoute[]; activeRoute: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const points = pins.filter(({ kind }) => kind !== "incident").map(({ point }) => point).concat(routes.flatMap(({ path }) => path));
+  const latitudes = points.map(([lat]) => lat);
+  const longitudes = points.map(([, lng]) => lng);
+  const minLat = points.length ? Math.min(...latitudes) : 37.46;
+  const maxLat = points.length ? Math.max(...latitudes) : 37.65;
+  const minLng = points.length ? Math.min(...longitudes) : 126.82;
+  const maxLng = points.length ? Math.max(...longitudes) : 127.16;
+  const latSpan = Math.max(0.01, maxLat - minLat) / 0.69;
+  const lngSpan = Math.max(0.014, maxLng - minLng) / 0.76;
+  const centerLat = (maxLat + minLat) / 2;
+  const centerLng = (maxLng + minLng) / 2;
+  function project([lat, lng]: Point) {
+    return [(lng - centerLng) / lngSpan + 0.5, (centerLat - lat) / latSpan + 0.5] as const;
+  }
 
   useEffect(() => {
-    const context = canvas.current?.getContext("2d");
-    if (!context) return;
-    const width = 1000;
-    const height = 660;
-    const line = (points: [number, number][], color: string, weight: number) => {
-      context.beginPath();
-      points.forEach(([x, y], index) => {
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
-      });
-      context.strokeStyle = color;
-      context.lineWidth = weight;
-      context.lineJoin = "round";
-      context.lineCap = "round";
-      context.stroke();
-    };
-    context.fillStyle = "#e8eee7";
-    context.fillRect(0, 0, width, height);
-    for (let row = 0; row < 14; row++) {
-      for (let column = 0; column < 24; column++) {
-        context.fillStyle = (column * 7 + row * 13) % 9 < 2 ? "#d4e5d2" : "#e0e7df";
-        context.fillRect(column * 57 - 140 + row * 9, row * 56 - 30, 48, 45);
+    const element = canvas.current;
+    const context = element?.getContext("2d");
+    if (!element || !context) return;
+    function draw() {
+      if (!element || !context) return;
+      const { clientWidth: width, clientHeight: height } = element;
+      const ratio = window.devicePixelRatio || 1;
+      element.width = width * ratio;
+      element.height = height * ratio;
+      context.scale(ratio, ratio);
+      const ordered = routes.map((route, index) => ({ route, selected: index === activeRoute })).sort((a, b) => Number(a.selected) - Number(b.selected));
+      for (const { route, selected } of ordered) {
+        const style = routeStyle(selected);
+        context.beginPath();
+        route.path.forEach(([lat, lng], index) => {
+          const x = ((lng - centerLng) / lngSpan + 0.5) * width;
+          const y = ((centerLat - lat) / latSpan + 0.5) * height;
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        });
+        context.strokeStyle = style.color;
+        context.lineWidth = style.weight;
+        context.lineJoin = "round";
+        context.lineCap = "round";
+        context.setLineDash(style.dashed ? [8, 7] : []);
+        context.stroke();
       }
     }
-    for (let index = 0; index < 17; index++) {
-      const x = index * 78 - 130;
-      line([[x, 0], [x - 30, 210], [x + 65, 450], [x + 130, height]], "#f7f8f2", 5);
-    }
-    for (let index = 0; index < 11; index++) {
-      const y = index * 68 - 70;
-      line([[0, y + 35], [310, y], [590, y + 36], [width, y - 10]], "#f7f8f2", 5);
-    }
-    const river: [number, number][] = [[-80, 143], [115, 190], [225, 244], [342, 306], [458, 340], [574, 389], [665, 438], [756, 423], [860, 375], [1080, 369]];
-    line(river, "#c8e2ce", 104);
-    line(river, "#b9dce5", 75);
-    for (const x of [272, 454, 643, 800]) {
-      line([[x + 24, 145], [x, 315], [x - 22, 470], [x - 70, 590]], "#faf8ec", 9);
-    }
-  }, []);
+    const observer = new ResizeObserver(draw);
+    observer.observe(element);
+    draw();
+    return () => observer.disconnect();
+  }, [routes, activeRoute, centerLng, centerLat, lngSpan, latSpan]);
 
   return (
-    <div className="schematic" aria-label="한강 주변 예시 지도">
-      <canvas ref={canvas} width={1000} height={660} aria-hidden="true" />
-      <span className="place-label yeouido">여의도</span>
-      <span className="place-label yongsan">용산구</span>
-      <span className="place-label dongjak">동작구</span>
-      <span className="place-label river">한강</span>
+    <div className="schematic" aria-label="배경 지도 없는 좌표 미리보기">
+      <canvas ref={canvas} aria-hidden="true" />
       {pins.map(({ id, point, kind, label, text }) => {
         const [x, y] = project(point);
         if (x < 0 || x > 1 || y < 0 || y > 1) return null;
@@ -92,7 +98,7 @@ function Schematic({ pins }: { pins: Pin[] }) {
   );
 }
 
-export default function RideMap({ pins }: { pins: Pin[] }) {
+export default function RideMap({ pins, routes, activeRoute }: { pins: Pin[]; routes: BicycleRoute[]; activeRoute: number }) {
   const container = useRef<HTMLDivElement>(null);
   const [engine, setEngine] = useState<{ maps: KakaoMaps; view: MapView }>();
   const [failed, setFailed] = useState(false);
@@ -130,10 +136,27 @@ export default function RideMap({ pins }: { pins: Pin[] }) {
   useEffect(() => {
     if (!engine) return;
     const { maps, view } = engine;
+    const points = pins.filter(({ kind }) => kind !== "incident").map(({ point }) => point).concat(routes.flatMap(({ path }) => path));
+    if (!points.length) return;
     const bounds = new maps.LatLngBounds();
-    pins.filter(({ kind }) => kind !== "incident").forEach(({ point }) => bounds.extend(new maps.LatLng(...point)));
-    view.setBounds(bounds, 84, 56, 76, 56);
-  }, [engine, pins]);
+    points.forEach((point) => bounds.extend(new maps.LatLng(...point)));
+    view.setBounds(bounds, 58, 28, 120, 28);
+  }, [engine, pins, routes]);
+
+  useEffect(() => {
+    if (!engine) return;
+    const { maps, view } = engine;
+    const lines = routes.map(({ path }, index) => {
+      const selected = index === activeRoute;
+      const style = routeStyle(selected);
+      return new maps.Polyline({
+        map: view, path: path.map((point) => new maps.LatLng(...point)),
+        strokeColor: style.color, strokeWeight: style.weight, strokeOpacity: 0.94,
+        strokeStyle: style.dashed ? "shortdash" : "solid", zIndex: selected ? 2 : 1,
+      });
+    });
+    return () => lines.forEach((line) => line.setMap(null));
+  }, [engine, routes, activeRoute]);
 
   useEffect(() => {
     if (!engine) return;
@@ -154,11 +177,11 @@ export default function RideMap({ pins }: { pins: Pin[] }) {
 
   return (
     <div className="ride-map">
-      {!engine && <Schematic pins={pins} />}
+      {!engine && <Schematic pins={pins} routes={routes} activeRoute={activeRoute} />}
       <div ref={container} className={`kakao-map ${engine ? "ready" : ""}`} aria-label="카카오 지도" aria-hidden={!engine} />
       {key && <Script id="kakao-maps" src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(key)}&autoload=false`} onReady={initialize} onError={() => setFailed(true)} />}
       <div className="map-status" role="status">
-        {engine ? "카카오맵" : !key ? "예시 지도 · 카카오맵 키 미설정" : failed ? "예시 지도 · 카카오맵 연결 실패" : "예시 지도 · 카카오맵 연결 중"}
+        {engine ? "카카오맵" : !key ? "좌표 미리보기 · 카카오맵 키 미설정" : failed ? "좌표 미리보기 · 카카오맵 연결 실패" : "카카오맵 연결 중"}
         {!engine && failed && <small>키와 현재 주소의 도메인 등록을 확인해 주세요.</small>}
       </div>
       {engine && (
@@ -170,6 +193,11 @@ export default function RideMap({ pins }: { pins: Pin[] }) {
       <div className="map-legend">
         <span><i className="legend-station" /> 따릉이 대여 가능 대수</span>
         <span><i className="legend-incident" /> 과거 사고다발지역</span>
+      </div>
+      <div className="route-attribution">
+        <a href="https://routing.openstreetmap.de/about.html">FOSSGIS OSRM 자전거</a>
+        {" · "}<a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a>
+        {" · "}<a href="https://www.openstreetmap.org/fixthemap">지도 수정</a>
       </div>
     </div>
   );

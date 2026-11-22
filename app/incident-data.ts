@@ -1,4 +1,4 @@
-import type { Point } from "./demo-data";
+import type { Point } from "./geo";
 
 export type Incident = {
   id: string;

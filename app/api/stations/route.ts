@@ -60,7 +60,9 @@ export function GET(request: Request) {
     return withProvider("SEOUL_API_KEY", async (key) => {
       const { items, fetchedAt } = await loadSnapshot(key);
       const radiusMeters = 1500;
-      const nearby = items.map((station) => ({ ...station, distanceMeters: distanceMeters(origin, station.point) }))
+      const availableOnly = params.get("available") === "1";
+      const nearby = items.filter(({ bikes }) => !availableOnly || (bikes ?? 0) > 0)
+        .map((station) => ({ ...station, distanceMeters: distanceMeters(origin, station.point) }))
         .filter((station) => station.distanceMeters <= radiusMeters)
         .sort((a, b) => a.distanceMeters - b.distanceMeters)
         .slice(0, 8)
