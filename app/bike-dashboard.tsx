@@ -13,6 +13,7 @@ import StationPanel, { type StationRadius, type StationResult, type StationSide 
 type Place = { id: string; name: string; address: string; point: Point };
 type PlaceField = { text: string; place?: Place };
 type RouteResult = { routes: BicycleRoute[]; station: NearbyStation };
+type IncidentResult = { year: number | null; items: Incident[]; status: "complete" | "partial" };
 const emptyStations: NearbyStation[] = [];
 const emptyIncidents: Incident[] = [];
 const emptyRoutes: BicycleRoute[] = [];
@@ -90,7 +91,8 @@ export default function BikeDashboard() {
   const [side, setSide] = useState<StationSide>("start");
   const [startRadius, setStartRadius] = useState<StationRadius>(500);
   const [endRadius, setEndRadius] = useState<StationRadius>(500);
-  const [incidentResult, setIncidentResult] = useState<{ year: number | null; items: Incident[] } | string>();
+  const [incidentResult, setIncidentResult] = useState<IncidentResult | string>();
+  const [incidentRefresh, setIncidentRefresh] = useState(0);
   const [routeResult, setRouteResult] = useState<RouteResult>();
   const [activeRoute, setActiveRoute] = useState(0);
   const [routeError, setRouteError] = useState("");
@@ -115,7 +117,7 @@ export default function BikeDashboard() {
     const controller = new AbortController();
     async function load() {
       try {
-        const result = await fetchData<{ year: number | null; items: Incident[] }>("/api/incidents", controller.signal);
+        const result = await fetchData<IncidentResult>("/api/incidents", controller.signal);
         if (!controller.signal.aborted) setIncidentResult(result);
       } catch (error) {
         if (!controller.signal.aborted) setIncidentResult(requestMessage(error));
@@ -123,10 +125,15 @@ export default function BikeDashboard() {
     }
     void load();
     return () => controller.abort();
-  }, []);
+  }, [incidentRefresh]);
 
   const incidentYear = typeof incidentResult === "object" ? incidentResult.year : null;
   const incidents = typeof incidentResult === "object" ? incidentResult.items : emptyIncidents;
+  const partialIncidents = typeof incidentResult === "object" && incidentResult.status === "partial";
+  const incidentStatus = typeof incidentResult === "string" ? "사고정보 조회 실패. 다시 조회해 주세요."
+    : !incidentResult ? "자료 조회 중"
+    : partialIncidents ? `${incidentYear}년 기준 · 일부 지역만 조회 성공 (${incidents.length}곳 확인)`
+    : `${incidentYear ? `${incidentYear}년 기준 · 서울 ` : ""}${incidents.length}곳${incidents.length ? "" : " · 정상 조회"}`;
   const nearbyCounts = useMemo(() => routes.map(({ path }) => new Set(
     incidents.filter(({ point }) => distanceFromRoute(point, path) <= 150).map(({ id }) => id),
   ).size), [routes, incidents]);
@@ -228,7 +235,7 @@ export default function BikeDashboard() {
                       <span className="route-metrics">
                         <span>거리 <b>{(route.distance / 1000).toFixed(2)} km</b></span>
                         <span>예상 소요 <b>약 {Math.max(1, Math.round(route.duration / 60))}분</b></span>
-                        <span>인접 사고다발지역 <b>{incidentYear ? `${nearbyCounts[index]}곳` : "자료 없음"}</b></span>
+                        <span>인접 사고다발지역 <b>{typeof incidentResult === "string" ? "조회 불가" : !incidentResult ? "조회 중" : `${nearbyCounts[index]}곳${partialIncidents ? " 확인 · 일부" : ""}`}</b></span>
                       </span>
                     </button>
                   ))}
@@ -239,8 +246,13 @@ export default function BikeDashboard() {
             </section>
             <WeatherCard key={query} place={origin?.name} query={query} />
             <section className="card details">
-              <h2>과거 사고다발지역</h2>
-              <p className="station-status" aria-live="polite">{incidentYear ? `${incidentYear}년 기준 · 서울 ${incidents.length}곳` : typeof incidentResult === "string" ? incidentResult : incidentResult ? "자료 없음" : "자료 조회 중"}</p>
+              <div className="card-heading"><h2>과거 사고다발지역</h2>
+                <button className="incident-refresh" type="button" disabled={!incidentResult} onClick={() => {
+                  setIncidentResult(undefined);
+                  setIncidentRefresh(incidentRefresh + 1);
+                }}>다시 조회</button>
+              </div>
+              <p className="station-status" aria-live="polite">{incidentStatus}</p>
               <p className="source-note">출처 <a href="https://www.data.go.kr/data/15056681/openapi.do">한국도로교통공단</a></p>
             </section>
           </aside>

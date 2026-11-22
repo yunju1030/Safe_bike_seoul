@@ -148,6 +148,8 @@ small { color: var(--muted); font-size: 13px; }
 .station-panel-footer button:disabled { opacity: .5; }
 .station-credit { margin-top: 5px; color: #526782; font-size: 12px; }
 .station-credit a { color: inherit; text-underline-offset: 2px; }
+.incident-refresh { padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); font-size: 13px; }
+.incident-refresh:disabled { opacity: .5; cursor: default; }
 .route-options { display: grid; gap: 9px; margin-block: 10px; }
 .route-option { width: 100%; min-width: 0; border: 1px solid #d9e2ec; border-radius: 13px; padding: 11px; background: #fff; text-align: left; color: #162847; }
 .route-option[aria-pressed="true"] { border-color: #1859ed; outline: 1px solid #1859ed; background: #f0f6ff; }
