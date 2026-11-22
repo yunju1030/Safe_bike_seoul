@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Point } from "./geo";
-import { distanceFromRoute, type BicycleRoute } from "./bicycle-route";
-import type { Incident } from "./incident-data";
+import type { BicycleRoute } from "./bicycle-route";
+import { incidentsNearRoute, incidentRadiusMeters, type Incident } from "./incident-data";
 import RideMap, { type Pin } from "./ride-map";
 import type { NearbyStation } from "./station-types";
 import WeatherCard from "./weather-card";
@@ -134,9 +134,8 @@ export default function BikeDashboard() {
     : !incidentResult ? "자료 조회 중"
     : partialIncidents ? `${incidentYear}년 기준 · 일부 지역만 조회 성공 (${incidents.length}곳 확인)`
     : `${incidentYear ? `${incidentYear}년 기준 · 서울 ` : ""}${incidents.length}곳${incidents.length ? "" : " · 정상 조회"}`;
-  const nearbyCounts = useMemo(() => routes.map(({ path }) => new Set(
-    incidents.filter(({ point }) => distanceFromRoute(point, path) <= 150).map(({ id }) => id),
-  ).size), [routes, incidents]);
+  const nearbyByRoute = useMemo(() => routes.map(({ path }) => incidentsNearRoute(incidents, path)), [routes, incidents]);
+  const selectedNearby = nearbyByRoute[activeRoute];
   const pins = useMemo<Pin[]>(() => [
     ...(origin ? [{ point: origin.point, label: `검색 출발지 · ${origin.name}`, kind: "origin" as const }] : []),
     ...(station ? [{ point: station.point, label: `출발 대여소 · ${station.name} · ${station.bikes}대`, kind: "start" as const }] : []),
@@ -235,26 +234,52 @@ export default function BikeDashboard() {
                       <span className="route-metrics">
                         <span>거리 <b>{(route.distance / 1000).toFixed(2)} km</b></span>
                         <span>예상 소요 <b>약 {Math.max(1, Math.round(route.duration / 60))}분</b></span>
-                        <span>인접 사고다발지역 <b>{typeof incidentResult === "string" ? "조회 불가" : !incidentResult ? "조회 중" : `${nearbyCounts[index]}곳${partialIncidents ? " 확인 · 일부" : ""}`}</b></span>
+                        <span>인접 사고다발지역 <b>{typeof incidentResult === "string" ? "조회 불가" : !incidentResult ? "조회 중" : `${nearbyByRoute[index].length}곳${partialIncidents ? " 확인 · 일부" : ""}`}</b></span>
                       </span>
                     </button>
                   ))}
                 </div>
                 {routes.length === 1 && <p className="station-status">대안 경로 없음</p>}
-                <p className="comparison-note">{incidentYear ? `${incidentYear}년 기준 · ` : ""}경로에서 중심점까지 150m 이내인 과거 사고다발지역을 셉니다. 실제 주행 안전성을 판단하는 지표가 아닙니다.</p>
+                <p className="comparison-note">{incidentYear ? `${incidentYear}년 기준 · ` : ""}경로에서 중심점까지 {incidentRadiusMeters}m 이내인 과거 사고다발지역을 셉니다. 실제 주행 안전성을 판단하는 지표가 아닙니다.</p>
               </> : <p className="station-status" aria-live="polite">{loadingRoute ? "자전거 경로 조회 중" : "출발 대여소와 목적지를 선택한 뒤 경로를 찾아보세요."}</p>}
             </section>
-            <WeatherCard key={query} place={origin?.name} query={query} />
-            <section className="card details">
-              <div className="card-heading"><h2>과거 사고다발지역</h2>
+            <section className="card details incident-panel" aria-labelledby="incident-heading">
+              <div className="card-heading"><h2 id="incident-heading">{selectedNearby ? `경로 ${activeRoute === 0 ? "A" : "B"} 주변 사고다발지역` : "과거 사고다발지역"}</h2>
+                {incidentYear && <span className="tag">{incidentYear}년 과거 통계</span>}
                 <button className="incident-refresh" type="button" disabled={!incidentResult} onClick={() => {
                   setIncidentResult(undefined);
                   setIncidentRefresh(incidentRefresh + 1);
                 }}>다시 조회</button>
               </div>
               <p className="station-status" aria-live="polite">{incidentStatus}</p>
+              {typeof incidentResult === "object" && (
+                <div className="incident-route-results" aria-live="polite">
+                  {!selectedNearby ? <p className="station-status">경로를 선택하면 주변 사고다발지역을 확인할 수 있습니다.</p>
+                    : selectedNearby.length === 0 ? <p className="incident-empty">{partialIncidents ? "조회된 자료에서 확인된 사고다발지역 없음 · 일부 미조회" : "사고다발지역 없음"}</p>
+                    : <ol className="incident-rows">
+                      {selectedNearby.map(({ incident, distance }) => {
+                        const severity = (incident.fatal ?? 0) > 0 ? "사망사고 포함"
+                          : (incident.serious ?? 0) > 0 ? "중상사고 포함"
+                          : (incident.minor ?? 0) > 0 || (incident.reported ?? 0) > 0 ? "경상·부상신고" : null;
+                        const details = [
+                          ["사상자", incident.casualties], ["사망", incident.fatal], ["중상", incident.serious],
+                          ["경상", incident.minor], ["부상신고", incident.reported],
+                        ] as const;
+                        return <li key={incident.id}>
+                          <div className="incident-accident-count"><strong>{incident.count ?? "—"}</strong><small>사고 건수</small></div>
+                          <div>
+                            <h3>{incident.name}</h3>
+                            <p className="incident-distance">{severity && <span className="incident-severity" data-severe={(incident.fatal ?? 0) > 0 || (incident.serious ?? 0) > 0}>{severity}</span>} 경로에서 약 {Math.round(distance)}m</p>
+                            <p className="incident-casualties">{details.filter(([, count]) => count !== null).map(([label, count]) => `${label} ${count}명`).join(" · ")}</p>
+                          </div>
+                        </li>;
+                      })}
+                    </ol>}
+                </div>
+              )}
               <p className="source-note">출처 <a href="https://www.data.go.kr/data/15056681/openapi.do">한국도로교통공단</a></p>
             </section>
+            <WeatherCard key={query} place={origin?.name} query={query} />
           </aside>
           <section className="card map-card route-map-card" aria-label="서울 자전거 지도">
             <RideMap pins={pins} routes={showRoutes ? routes : emptyRoutes} activeRoute={activeRoute} />

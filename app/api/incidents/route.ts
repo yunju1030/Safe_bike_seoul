@@ -48,6 +48,8 @@ async function fetchPage(key: string, year: string, district: string, page: numb
     return location && name ? [{
       id: `${row.spot_cd ?? row.afos_fid ?? row.afos_id ?? ""}:${location.join(",")}`,
       name, area: string(row.sido_sgg_nm), count: number(row.occrrnc_cnt), point: location,
+      casualties: number(row.caslt_cnt), fatal: number(row.dth_dnv_cnt), serious: number(row.se_dnv_cnt),
+      minor: number(row.sl_dnv_cnt), reported: number(row.wnd_dnv_cnt),
     }] : [];
   });
   const total = attempt.total ?? items.length;
