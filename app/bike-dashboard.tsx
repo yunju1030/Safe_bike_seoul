@@ -8,17 +8,36 @@ import RideMap, { type Pin } from "./ride-map";
 import type { NearbyStation } from "./station-types";
 import WeatherCard from "./weather-card";
 import { fetchData, requestMessage } from "./data-request";
+import StationPanel, { type StationRadius, type StationResult, type StationSide } from "./station-panel";
 
 type Place = { id: string; name: string; address: string; point: Point };
 type PlaceField = { text: string; place?: Place };
-type StationResult = { query: string; refresh: number } & (
-  { items: NearbyStation[]; fetchedAt: string } | { error: string }
-);
 type RouteResult = { routes: BicycleRoute[]; station: NearbyStation };
 const emptyStations: NearbyStation[] = [];
 const emptyIncidents: Incident[] = [];
 const emptyRoutes: BicycleRoute[] = [];
-const stationTime = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+function locationQuery(place?: Place) {
+  return place ? new URLSearchParams({ lat: String(place.point[0]), lng: String(place.point[1]) }).toString() : "";
+}
+
+function useStations(query: string, refresh: number) {
+  const [result, setResult] = useState<StationResult>();
+  useEffect(() => {
+    if (!query) return;
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const { items, fetchedAt } = await fetchData<{ items: NearbyStation[]; fetchedAt: string }>(`/api/stations?${query}`, controller.signal);
+        if (!controller.signal.aborted) setResult({ query, refresh, items, fetchedAt });
+      } catch (error) {
+        if (!controller.signal.aborted) setResult({ query, refresh, error: requestMessage(error) });
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [query, refresh]);
+  return result?.query === query && result.refresh === refresh ? result : undefined;
+}
 
 function PlaceSearch({ label, value, onChange }: {
   label: string; value: PlaceField; onChange: (value: PlaceField) => void;
@@ -66,8 +85,11 @@ export default function BikeDashboard() {
   const [start, setStart] = useState<PlaceField>({ text: "" });
   const [end, setEnd] = useState<PlaceField>({ text: "" });
   const [stationId, setStationId] = useState("");
-  const [stationResult, setStationResult] = useState<StationResult>();
   const [refresh, setRefresh] = useState(0);
+  const [arrivalRefresh, setArrivalRefresh] = useState(0);
+  const [side, setSide] = useState<StationSide>("start");
+  const [startRadius, setStartRadius] = useState<StationRadius>(500);
+  const [endRadius, setEndRadius] = useState<StationRadius>(500);
   const [incidentResult, setIncidentResult] = useState<{ year: number | null; items: Incident[] } | string>();
   const [routeResult, setRouteResult] = useState<RouteResult>();
   const [activeRoute, setActiveRoute] = useState(0);
@@ -79,28 +101,16 @@ export default function BikeDashboard() {
   const [showRoutes, setShowRoutes] = useState(true);
   const origin = start.place;
   const destination = end.place;
-  const query = origin ? new URLSearchParams({ lat: String(origin.point[0]), lng: String(origin.point[1]) }).toString() : "";
-  const currentStations = stationResult?.query === query && stationResult.refresh === refresh ? stationResult : undefined;
+  const query = locationQuery(origin);
+  const arrivalQuery = locationQuery(destination);
+  const currentStations = useStations(query && `${query}&available=1&radius=${startRadius}`, refresh);
+  const arrivalStations = useStations(side === "end" && arrivalQuery ? `${arrivalQuery}&radius=${endRadius}` : "", arrivalRefresh);
   const stations = currentStations && "items" in currentStations ? currentStations.items : emptyStations;
+  const visibleStations = side === "start" ? stations : arrivalStations && "items" in arrivalStations ? arrivalStations.items : emptyStations;
   const station = stations.find(({ id }) => id === stationId) ?? stations[0];
   const routes = routeResult?.routes ?? emptyRoutes;
 
   useEffect(() => () => routeRequest.current?.abort(), []);
-  useEffect(() => {
-    if (!query) return;
-    const controller = new AbortController();
-    async function load() {
-      try {
-        const { items, fetchedAt } = await fetchData<{ items: NearbyStation[]; fetchedAt: string }>(`/api/stations?${query}&available=1`, controller.signal);
-        if (!controller.signal.aborted) setStationResult({ query, refresh, items, fetchedAt });
-      } catch (error) {
-        if (!controller.signal.aborted) setStationResult({ query, refresh, error: requestMessage(error) });
-      }
-    }
-    void load();
-    return () => controller.abort();
-  }, [query, refresh]);
-
   useEffect(() => {
     const controller = new AbortController();
     async function load() {
@@ -124,13 +134,13 @@ export default function BikeDashboard() {
     ...(origin ? [{ point: origin.point, label: `검색 출발지 · ${origin.name}`, kind: "origin" as const }] : []),
     ...(station ? [{ point: station.point, label: `출발 대여소 · ${station.name} · ${station.bikes}대`, kind: "start" as const }] : []),
     ...(destination ? [{ point: destination.point, label: `도착 · ${destination.name}`, kind: "end" as const }] : []),
-    ...(showStations ? stations.filter(({ id }) => id !== station?.id).map(({ id, point, name, bikes }) => ({
-      id, point, label: `${name} · 대여 가능 ${bikes}대`, text: String(bikes), kind: "station" as const,
+    ...(showStations ? visibleStations.filter(({ id }) => id !== station?.id).map(({ id, point, name, bikes }) => ({
+      id, point, label: `${name} · ${bikes === null ? "대여 가능 대수 정보 없음" : `대여 가능 ${bikes}대`}`, text: bikes === null ? "—" : String(bikes), kind: "station" as const,
     })) : []),
     ...(showIncidents ? incidents.map(({ id, point, name, count }) => ({
       id, point, label: `${name} · ${incidentYear}년${count === null ? "" : ` 사고 ${count}건`}`, kind: "incident" as const,
     })) : []),
-  ], [origin, station, destination, showStations, showIncidents, stations, incidentYear, incidents]);
+  ], [origin, station, destination, showStations, showIncidents, visibleStations, incidentYear, incidents]);
 
   function clearRoute() {
     routeRequest.current?.abort();
@@ -194,28 +204,18 @@ export default function BikeDashboard() {
                 {routeError && <p className="form-error" role="alert">{routeError}</p>}
               </form>
             </section>
-            <section className="card details" aria-labelledby="station-heading">
-              <div className="card-heading"><h2 id="station-heading">출발 대여소</h2>
-                <button className="secondary" type="button" disabled={!currentStations} onClick={() => {
-                  clearRoute(); setRefresh(refresh + 1);
-                }}>다시 조회</button>
-              </div>
-              {!origin ? <p className="station-status">출발지를 선택하면 가까운 대여소를 찾습니다.</p>
-                : !currentStations ? <p className="station-status" role="status">대여소를 조회하고 있습니다.</p>
-                : "error" in currentStations ? <p className="station-status" role="status">{currentStations.error}</p>
-                : <>
-                  {station ? <label className="station-select">
-                    <span>대여 가능한 곳 · 가까운 순</span>
-                    <select value={station.id} onChange={(event) => { clearRoute(); setStationId(event.target.value); }}>
-                      {stations.map(({ id, name, bikes, distanceMeters }) => (
-                        <option key={id} value={id}>{name} · {bikes}대 · {distanceMeters}m</option>
-                      ))}
-                    </select>
-                  </label> : <p className="station-status">출발지에서 1.5km 이내에 대여 가능한 대여소가 없습니다.</p>}
-                  <p className="station-status">따릉이 조회 <time dateTime={currentStations.fetchedAt}>{stationTime.format(new Date(currentStations.fetchedAt))}</time> (한국 표준시)</p>
-                </>}
-              <p className="source-note">출처 <a href="https://data.seoul.go.kr/dataList/OA-15493/A/1/datasetView.do">서울 열린데이터광장</a></p>
-            </section>
+            <StationPanel side={side} setSide={setSide} radius={side === "start" ? startRadius : endRadius}
+              setRadius={(radius) => {
+                if (side === "end") setEndRadius(radius);
+                else if (radius !== startRadius) { clearRoute(); setStartRadius(radius); }
+              }}
+              place={side === "start" ? origin?.name : destination?.name}
+              result={side === "start" ? currentStations : arrivalStations} selectedId={station?.id}
+              onSelect={(id) => { if (id !== station?.id) { clearRoute(); setStationId(id); } }}
+              refresh={() => {
+                if (side === "end") setArrivalRefresh(arrivalRefresh + 1);
+                else { clearRoute(); setRefresh(refresh + 1); }
+              }} />
             <section className="card details" aria-labelledby="routes-heading">
               <h2 id="routes-heading">경로 비교</h2>
               {routeResult && destination ? <>

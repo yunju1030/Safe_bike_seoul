@@ -16,7 +16,7 @@ async function loadPage(key: string, page: number, limit: number) {
     const location = point(row.stationLatitude, row.stationLongitude);
     const name = string(row.stationName);
     const id = string(row.stationId);
-    return id && location && name ? [{ id, name, bikes: number(row.parkingBikeTotCnt), point: location }] : [];
+    return id && location && name ? [{ id, name, bikes: number(row.parkingBikeTotCnt), racks: number(row.rackTotCnt), point: location }] : [];
   });
   return { items, rowCount: rentals.row.length };
 }
@@ -56,16 +56,17 @@ export function GET(request: Request) {
   if (params.has("lat") || params.has("lng")) {
     const origin = point(params.get("lat"), params.get("lng"));
     if (!origin) return badRequest("유효한 위도(lat)와 경도(lng)를 함께 입력해 주세요.");
+    const radiusMeters = pageNumber(params, "radius", 1500, 2000);
+    if (radiusMeters === null || radiusMeters < 300) return badRequest("조회 반경은 300~2000m여야 합니다.");
 
     return withProvider("SEOUL_API_KEY", async (key) => {
       const { items, fetchedAt } = await loadSnapshot(key);
-      const radiusMeters = 1500;
       const availableOnly = params.get("available") === "1";
       const nearby = items.filter(({ bikes }) => !availableOnly || (bikes ?? 0) > 0)
         .map((station) => ({ ...station, distanceMeters: distanceMeters(origin, station.point) }))
         .filter((station) => station.distanceMeters <= radiusMeters)
         .sort((a, b) => a.distanceMeters - b.distanceMeters)
-        .slice(0, 8)
+        .slice(0, params.has("radius") ? 40 : 8)
         .map((station) => ({ ...station, distanceMeters: Math.round(station.distanceMeters) }));
       return { source: "seoul", radiusMeters, fetchedAt: new Date(fetchedAt).toISOString(), items: nearby };
     });

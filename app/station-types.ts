@@ -2,6 +2,7 @@ export type Station = {
   id: string;
   name: string;
   bikes: number | null;
+  racks: number | null;
   point: [number, number];
 };
 

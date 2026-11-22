@@ -114,10 +114,40 @@ small { color: var(--muted); font-size: 13px; }
 .route-sidebar h1 { font-size: 26px; }
 .route-sidebar .primary { background: #1859ed; }
 .route-sidebar .primary:disabled { opacity: .65; cursor: progress; }
-.route-sidebar .secondary { padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 14px; }
-.route-sidebar .secondary:disabled { opacity: .5; cursor: default; }
-.station-select { display: grid; min-width: 0; gap: 6px; margin-block: 10px 6px; color: var(--muted); font-size: 14px; }
-.station-select select { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: #f5f8fb; font: inherit; }
+.station-panel { padding: 16px; color: #14223a; border-color: #dce4ee; box-shadow: 0 2px 5px #21375610; }
+.station-panel-header, .station-radius-row, .station-panel-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px; }
+.station-panel-header h2 { font-size: 18px; white-space: nowrap; margin-right: auto; }
+.station-panel-header h2 span { margin-right: 3px; }
+.station-endpoints { display: flex; padding: 2px; gap: 1px; background: #edf2f8; border-radius: 999px; }
+.station-endpoints button, .station-radii button, .station-pick { border: 0; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.station-endpoints button { background: transparent; color: #4e627c; border-radius: 999px; padding: 5px 8px; }
+.station-endpoints button[aria-pressed="true"] { color: #17243a; background: white; box-shadow: 0 1px 4px #20355429; }
+.station-live { padding: 4px 7px; color: #006a4e; background: #effbf6; border: 1px solid #62d8b2; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.station-live::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #17a678; vertical-align: 2px; }
+.station-radius-row { margin-top: 13px; }
+.station-radius-row p { color: #526782; font-size: 14px; }
+.station-radius-row strong { color: #2a3e58; }
+.station-radii { display: flex; flex-wrap: wrap; gap: 4px; }
+.station-radii button, .station-pick { color: #354a64; background: #edf2f8; border-radius: 8px; padding: 5px 7px; }
+.station-radii button[aria-pressed="true"] { color: white; background: #14223a; }
+.station-rows { max-height: 328px; overflow: auto; scrollbar-gutter: stable; margin: 8px 0 0; padding: 0; list-style: none; }
+.station-row { display: flex; align-items: center; gap: 8px; min-height: 66px; padding: 9px 4px 9px 0; border-bottom: 1px solid #e8eef5; }
+.station-row-rank { width: 17px; flex-shrink: 0; color: #627994; text-align: center; font-size: 13px; font-weight: 700; }
+.station-row-info { min-width: 0; flex: 1; }
+.station-row-info strong { display: block; font-size: 15px; overflow-wrap: anywhere; }
+.station-row-info small, .station-quantity small { display: block; color: #526782; font-size: 12px; margin-top: 2px; }
+.station-bar { display: block; height: 5px; margin-top: 5px; background: #edf2f8; border-radius: 999px; overflow: hidden; }
+.station-bar i { display: block; height: 100%; background: #16984d; border-radius: inherit; }
+.station-quantity { min-width: 55px; text-align: right; }
+.station-quantity strong { color: #08813d; font-size: 22px; font-variant-numeric: tabular-nums; }
+.station-quantity small { white-space: nowrap; }
+.station-pick { min-width: 49px; }
+.station-pick[aria-pressed="true"] { background: #007f56; color: white; }
+.station-panel-footer { min-height: 28px; margin-top: 7px; color: #526782; font-size: 12px; }
+.station-panel-footer button { border: 0; background: transparent; color: #385473; padding: 4px; margin-left: auto; font-size: 13px; font-weight: 700; }
+.station-panel-footer button:disabled { opacity: .5; }
+.station-credit { margin-top: 5px; color: #526782; font-size: 12px; }
+.station-credit a { color: inherit; text-underline-offset: 2px; }
 .route-options { display: grid; gap: 9px; margin-block: 10px; }
 .route-option { width: 100%; min-width: 0; border: 1px solid #d9e2ec; border-radius: 13px; padding: 11px; background: #fff; text-align: left; color: #162847; }
 .route-option[aria-pressed="true"] { border-color: #1859ed; outline: 1px solid #1859ed; background: #f0f6ff; }
